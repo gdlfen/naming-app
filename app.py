@@ -20,6 +20,45 @@ except ImportError:
 # ================= 页面基础设置 =================
 st.set_page_config(page_title="名字通（国学起名系统）", layout="centered", page_icon="🌟")
 
+# 注入自定义 CSS：修改标题大小颜色，以及标签橙色底色
+st.markdown("""
+<style>
+/* 1. 大标题缩小并改为金色 */
+.main-title {
+    font-size: 26px !important;
+    color: #DAA520 !important; /* 稳重的金黄色 (GoldenRod) */
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 0px;
+}
+.sub-title-desc {
+    text-align: center;
+    color: gray;
+    font-size: 14px;
+    margin-bottom: 20px;
+}
+/* 2. 小标题缩小并改为蓝色 */
+.sub-title {
+    font-size: 18px !important;
+    color: #1E90FF !important; /* 亮蓝色 */
+    font-weight: bold;
+    margin-top: 15px;
+    margin-bottom: 15px;
+    border-left: 4px solid #1E90FF;
+    padding-left: 8px;
+}
+/* 3. 多选框(风格偏好)改为橙底色 */
+span[data-baseweb="tag"] {
+    background-color: #FF8C00 !important; /* 深橙色 */
+    color: white !important;
+}
+/* 适配橙年底色，将标签上的关闭按钮改成白色 */
+span[data-baseweb="tag"] svg {
+    fill: white !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # ================= 会话状态初始化 =================
 if 'admin_logged_in' not in st.session_state:
     st.session_state.admin_logged_in = False
@@ -30,6 +69,8 @@ if 'api_base' not in st.session_state:
     st.session_state.api_base = "https://api.openai.com/v1"
 if 'model_name' not in st.session_state:
     st.session_state.model_name = "gpt-4o"
+if 'usage_count' not in st.session_state:
+    st.session_state.usage_count = 0  # 记录使用次数统计
 
 # ================= 后台管理 (侧边栏) =================
 with st.sidebar:
@@ -45,21 +86,49 @@ with st.sidebar:
                 st.error("密码错误！")
     else:
         st.success("管理员已登录")
+        
+        # --- 新增：使用情况统计 ---
+        st.markdown("### 📊 使用情况 (云端实例)")
+        st.metric(label="累计成功推演生成次数", value=st.session_state.usage_count)
+        st.divider()
+        
+        # --- 优化：AI模型下拉菜单 ---
+        st.markdown("### 🤖 AI 接口配置")
         st.session_state.api_base = st.text_input("接口地址 (Base URL)", value=st.session_state.api_base)
         st.session_state.api_key = st.text_input("API 密钥 (API Key)", value=st.session_state.api_key, type="password")
-        st.session_state.model_name = st.text_input("模型名称 (Model)", value=st.session_state.model_name)
+        
+        common_models = [
+            "gpt-4o", "gpt-3.5-turbo", 
+            "deepseek-chat", "deepseek-reasoner", 
+            "qwen-plus", "qwen-max", 
+            "moonshot-v1-8k", 
+            "自定义其他模型..."
+        ]
+        curr_model = st.session_state.model_name
+        
+        try:
+            idx = common_models.index(curr_model)
+        except ValueError:
+            idx = len(common_models) - 1
+            
+        selected_model = st.selectbox("选择模型名称 (Model)", common_models, index=idx)
+        
+        if selected_model == "自定义其他模型...":
+            st.session_state.model_name = st.text_input("手动输入模型名称", value=curr_model)
+        else:
+            st.session_state.model_name = selected_model
         
         if st.button("退出登录"):
             st.session_state.admin_logged_in = False
             st.rerun()
 
 # ================= 前端主界面 (用户端) =================
-st.title("🌟 名字通 - 国学起名系统 v3.0")
-st.markdown("融合传统周易八卦、五行生克与现代 AI 智能的前沿起名引擎。")
-st.divider()
+# 替换原有的原生 title，使用注入样式的 HTML 渲染大标题
+st.markdown('<div class="main-title">🌟 名字通 - 国学起名系统 v3.0</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-title-desc">融合传统周易八卦、五行生克与现代 AI 智能的前沿起名引擎。</div>', unsafe_allow_html=True)
 
 # 1. 基础信息填写
-st.subheader("1. 基础信息填写")
+st.markdown('<div class="sub-title">1. 基础信息填写</div>', unsafe_allow_html=True)
 mode = st.radio("选择起名类型", ["为人起名", "为公司起名"], horizontal=True)
 
 col1, col2 = st.columns(2)
@@ -87,7 +156,7 @@ else:
     comp_industry = st.text_input("行业/业务范围", value="互联网科技")
 
 # 2. 风格偏好与要求
-st.subheader("2. 风格偏好与输出要求")
+st.markdown('<div class="sub-title">2. 风格偏好与输出要求</div>', unsafe_allow_html=True)
 all_prefs = ["寓意好", "音韵美", "合五行", "合数理", "有典故", "有个性", "少歧义", "求时尚", "中性别", "地域性", "中英文"]
 selected_prefs = st.multiselect("风格偏好 (可多选)", all_prefs, default=["寓意好", "合五行", "合数理", "音韵美", "有典故"])
 
@@ -214,7 +283,7 @@ if st.button("🚀 连接 AI 开始推演方案", type="primary", use_container_
             try:
                 bazi_info = get_bazi_info()
                 
-                # 构造 Prompt (完全复刻您的逻辑)
+                # 构造 Prompt
                 prompt = "你是一个精通中国传统文化、周易八卦、五行生克、三才五格数理、诗词歌赋的资深国学起名大师。\n\n"
                 prompt += f"【背景信息】\n- 性别：{gender}\n- 出生时间与八字：\n{bazi_info}\n（请在第一部分结合性别给出详细的五行喜忌分析）\n"
 
@@ -250,6 +319,8 @@ if st.button("🚀 连接 AI 开始推演方案", type="primary", use_container_
                 
                 # 页面展示
                 st.success("✅ 推演成功！")
+                st.session_state.usage_count += 1  # 增加使用次数统计
+                
                 st.markdown(ai_content.replace(re.search(r'【五行色彩：喜=.*，忌=.*】', ai_content).group(0), '') if re.search(r'【五行色彩：喜=.*，忌=.*】', ai_content) else ai_content)
 
                 # 生成 Word 内存文件并提供下载
