@@ -14,11 +14,33 @@ st.set_page_config(page_title="国学传统文化 AI 起名系统", layout="cent
 
 st.title("🌟 国学传统文化 AI 起名系统")
 
-# 1. 侧边栏：AI 模型配置
+# 1. 侧边栏：AI 模型配置 (加入下拉菜单功能)
 st.sidebar.header("1. AI 模型配置")
-api_base = st.sidebar.text_input("接口地址 (Base URL)", value="https://api.openai.com/v1")
+
+# 接口地址菜单
+api_base_options = [
+    "https://api.openai.com/v1",
+    "https://api.deepseek.com/v1",
+    "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "http://localhost:1234/v1"
+]
+api_base_selection = st.sidebar.selectbox("选择接口地址 (Base URL)", api_base_options)
+api_base = st.sidebar.text_input("或手动修改接口地址:", value=api_base_selection)
+
 api_key = st.sidebar.text_input("API 密钥 (API Key)", type="password")
-model_name = st.sidebar.text_input("模型名称", value="gpt-4o")
+
+# 模型名称菜单
+model_options = [
+    "gpt-4o", 
+    "gpt-3.5-turbo",
+    "deepseek-chat", 
+    "deepseek-reasoner",
+    "qwen-plus", 
+    "qwen-max",
+    "moonshot-v1-8k"
+]
+model_selection = st.sidebar.selectbox("选择模型名称 (Model)", model_options)
+model_name = st.sidebar.text_input("或手动修改模型名称:", value=model_selection)
 
 # 2. 主界面：模式选择
 mode = st.radio("选择起名类型", ["为人起名", "为公司起名"])
@@ -33,6 +55,13 @@ with col2:
     hour = st.slider("时辰 (24小时制)", 0, 23, 12)
     gender = st.radio("性别/属性", ["男 (乾造)", "女 (坤造)"], horizontal=True)
 
+# 【重点修复】：提前占位所有变量，避免未定义报错
+surname = ""
+birth_place = ""
+comp_prefix = ""
+comp_suffix = ""
+comp_industry = ""
+
 if mode == "为人起名":
     surname = st.text_input("姓氏")
     birth_place = st.text_input("出生地 (选填)")
@@ -41,9 +70,9 @@ else:
     comp_suffix = st.text_input("公司后缀 (如科技有限公司)")
     comp_industry = st.text_input("行业及业务范围")
 
-name_length = st.text_input("名字字数要求", value="3字")
+name_length = st.text_input("名字字数要求 (如: 3字)", value="3字")
 name_count = st.number_input("生成方案个数", min_value=1, max_value=10, value=3)
-other_req = st.text_area("其他补充要求")
+other_req = st.text_area("其他补充要求 (风格、偏好等)")
 
 # 生成逻辑
 if st.button("🚀 开始 AI 推演生成方案", type="primary"):
@@ -70,10 +99,13 @@ if st.button("🚀 开始 AI 推演生成方案", type="primary"):
                 # 构造 Prompt 
                 prompt = f"你是一个精通国学起名的专家。请根据以下信息生成 {name_count} 个名字方案，字数要求：{name_length}。\n"
                 prompt += f"八字信息：\n{bazi_info}\n"
-                if mode == "person":
+                
+                # 【重点修复】：这里的判断词必须与界面选择的完全一致
+                if mode == "为人起名":
                     prompt += f"个人起名，姓氏：{surname}\n"
                 else:
                     prompt += f"公司起名，全称结构：{comp_prefix} + [核心] + {comp_suffix}，行业：{comp_industry}\n"
+                    
                 if other_req:
                     prompt += f"其他要求：{other_req}\n"
                 
