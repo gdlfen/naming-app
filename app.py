@@ -17,10 +17,38 @@ try:
 except ImportError:
     HAS_LUNAR = False
 
+CONFIG_FILE = "naming_config.json"
+
+# ================= 全局物理配置读写 (解决前后端数据隔离) =================
+def load_global_config():
+    default_config = {
+        "api_base": "https://api.openai.com/v1",
+        "api_key": "",
+        "model_name": "gpt-4o",
+        "usage_count": 0
+    }
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                default_config.update(json.load(f))
+        except:
+            pass
+    return default_config
+
+def save_global_config(config_dict):
+    try:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(config_dict, f, ensure_ascii=False, indent=4)
+    except:
+        pass
+
+# 启动时读取全局配置
+global_config = load_global_config()
+
 # ================= 页面基础设置 =================
 st.set_page_config(page_title="名字通（国学起名系统）", layout="centered", page_icon="🌟")
 
-# 注入自定义 CSS：修改标题大小颜色，以及标签绿色底色
+# 注入自定义 CSS：强制覆盖生效
 st.markdown("""
 <style>
 /* 1. 大标题缩小并改为金色 */
@@ -47,13 +75,16 @@ st.markdown("""
     border-left: 4px solid #1E90FF;
     padding-left: 8px;
 }
-/* 3. 多选框(风格偏好)改为优雅的绿底色 */
-span[data-baseweb="tag"] {
-    background-color: #2E8B57 !important; /* 海洋绿 (SeaGreen) */
-    color: white !important;
+/* 3. 多选框(风格偏好)强制改为优雅的绿底色 */
+div[data-baseweb="select"] span[data-baseweb="tag"] {
+    background-color: #2E8B57 !important; /* 海洋绿 */
+    border: none !important;
 }
-/* 适配绿底色，将标签上的关闭按钮改成白色 */
-span[data-baseweb="tag"] svg {
+div[data-baseweb="select"] span[data-baseweb="tag"] span {
+    color: white !important;
+    font-weight: bold;
+}
+div[data-baseweb="select"] span[data-baseweb="tag"] svg {
     fill: white !important;
 }
 </style>
@@ -62,15 +93,6 @@ span[data-baseweb="tag"] svg {
 # ================= 会话状态初始化 =================
 if 'admin_logged_in' not in st.session_state:
     st.session_state.admin_logged_in = False
-
-if 'api_key' not in st.session_state:
-    st.session_state.api_key = ""
-if 'api_base' not in st.session_state:
-    st.session_state.api_base = "https://api.openai.com/v1"
-if 'model_name' not in st.session_state:
-    st.session_state.model_name = "gpt-4o"
-if 'usage_count' not in st.session_state:
-    st.session_state.usage_count = 0  # 记录使用次数统计
 
 # ================= 独立后台通道 (隐藏暗门) =================
 # 通过网址后缀 ?admin=true 进入此后台
@@ -91,7 +113,7 @@ if is_admin_mode:
         st.success("✅ 管理员已授权登录")
         
         st.markdown("### 📊 本次运行实例数据")
-        st.metric(label="累计成功推演生成次数", value=st.session_state.usage_count)
+        st.metric(label="累计成功推演生成次数", value=global_config.get("usage_count", 0))
         st.divider()
         
         st.markdown("### 🤖 AI 接口统一配置")
@@ -105,7 +127,7 @@ if is_admin_mode:
             "http://localhost:1234/v1",
             "自定义其他地址..."
         ]
-        curr_base = st.session_state.api_base
+        curr_base = global_config.get("api_base", "https://api.openai.com/v1")
         try:
             b_idx = common_bases.index(curr_base)
         except ValueError:
@@ -113,12 +135,12 @@ if is_admin_mode:
             
         selected_base = st.selectbox("选择接口地址 (Base URL)", common_bases, index=b_idx)
         if selected_base == "自定义其他地址...":
-            st.session_state.api_base = st.text_input("手动输入接口地址", value=curr_base)
+            new_api_base = st.text_input("手动输入接口地址", value=curr_base)
         else:
-            st.session_state.api_base = selected_base
+            new_api_base = selected_base
 
         # 2. 密钥设置
-        st.session_state.api_key = st.text_input("API 密钥 (API Key)", value=st.session_state.api_key, type="password")
+        new_api_key = st.text_input("API 密钥 (API Key)", value=global_config.get("api_key", ""), type="password")
         
         # 3. 模型名称 下拉菜单
         common_models = [
@@ -128,7 +150,7 @@ if is_admin_mode:
             "moonshot-v1-8k", 
             "自定义其他模型..."
         ]
-        curr_model = st.session_state.model_name
+        curr_model = global_config.get("model_name", "gpt-4o")
         try:
             m_idx = common_models.index(curr_model)
         except ValueError:
@@ -136,21 +158,26 @@ if is_admin_mode:
             
         selected_model = st.selectbox("选择模型名称 (Model)", common_models, index=m_idx)
         if selected_model == "自定义其他模型...":
-            st.session_state.model_name = st.text_input("手动输入模型名称", value=curr_model)
+            new_model_name = st.text_input("手动输入模型名称", value=curr_model)
         else:
-            st.session_state.model_name = selected_model
+            new_model_name = selected_model
         
         st.divider()
-        if st.button("保存并退出后台"):
+        if st.button("保存配置并退出后台", type="primary"):
+            # 将新的配置写入物理文件
+            global_config["api_base"] = new_api_base
+            global_config["api_key"] = new_api_key
+            global_config["model_name"] = new_model_name
+            save_global_config(global_config)
+            
             st.session_state.admin_logged_in = False
-            st.rerun()
+            st.success("配置已成功保存！请去掉网址后缀的 ?admin=true 返回前台。")
             
     # 如果处于后台模式，渲染完后台界面后直接终止程序，不显示前端用户界面
     st.stop()
 
 
 # ================= 前端主界面 (用户端纯净版) =================
-# 原有侧边栏已彻底删除，只保留用户核心功能
 st.markdown('<div class="main-title">🌟 名字通 - 国学起名系统 v3.0</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-title-desc">融合传统周易八卦、五行生克与现代 AI 智能的前沿起名引擎。</div>', unsafe_allow_html=True)
 
@@ -303,7 +330,8 @@ def generate_word_doc(content, bazi_info):
 # 生成按钮
 st.divider()
 if st.button("🚀 连接 AI 开始推演方案", type="primary", use_container_width=True):
-    if not st.session_state.api_key:
+    # 这里改为读取全局配置字典中的 key
+    if not global_config.get("api_key"):
         st.warning("⚠️ 接口暂未打通，请联系管理员配置。")
     else:
         with st.spinner("算力运转中，正在为您结合八字与国学全力推演，请稍候..."):
@@ -334,19 +362,21 @@ if st.button("🚀 连接 AI 开始推演方案", type="primary", use_container_
                 prompt += "\n【五行颜色底层指令提取】\n请在整篇回答的最开头（第一行），原封不动输出：\n【五行色彩：喜=X，忌=Y】（X和Y替换为单字，勿带其他文字）。\n"
                 prompt += f"\n【输出任务】\n生成 {name_count} 个方案。严格按以下结构：\n第一部分：五行喜忌分析\n第二部分：起名方案\n【方案一：XXX】\n1. 拼音：\n2. 五行：\n3. 数理：\n4. 音韵：\n5. 典故：\n6. 寓意：\n"
 
-                # 调用 API
-                client = OpenAI(api_key=st.session_state.api_key, base_url=st.session_state.api_base)
+                # 调用 API (使用全局配置)
+                client = OpenAI(api_key=global_config["api_key"], base_url=global_config["api_base"])
                 response = client.chat.completions.create(
-                    model=st.session_state.model_name,
+                    model=global_config["model_name"],
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.7
                 )
                 
                 ai_content = response.choices[0].message.content
                 
-                # 页面展示
+                # 页面展示并更新使用次数
                 st.success("✅ 推演成功！")
-                st.session_state.usage_count += 1  # 增加使用次数统计
+                
+                global_config["usage_count"] = global_config.get("usage_count", 0) + 1
+                save_global_config(global_config)
                 
                 st.markdown(ai_content.replace(re.search(r'【五行色彩：喜=.*，忌=.*】', ai_content).group(0), '') if re.search(r'【五行色彩：喜=.*，忌=.*】', ai_content) else ai_content)
 
