@@ -20,13 +20,13 @@ except ImportError:
 # ================= 页面基础设置 =================
 st.set_page_config(page_title="名字通（国学起名系统）", layout="centered", page_icon="🌟")
 
-# 注入自定义 CSS：修改标题大小颜色，以及标签橙色底色
+# 注入自定义 CSS：修改标题大小颜色，以及标签绿色底色
 st.markdown("""
 <style>
 /* 1. 大标题缩小并改为金色 */
 .main-title {
     font-size: 26px !important;
-    color: #DAA520 !important; /* 稳重的金黄色 (GoldenRod) */
+    color: #DAA520 !important; /* 金黄色 */
     font-weight: bold;
     text-align: center;
     margin-bottom: 0px;
@@ -47,12 +47,12 @@ st.markdown("""
     border-left: 4px solid #1E90FF;
     padding-left: 8px;
 }
-/* 3. 多选框(风格偏好)改为橙底色 */
+/* 3. 多选框(风格偏好)改为优雅的绿底色 */
 span[data-baseweb="tag"] {
-    background-color: #FF8C00 !important; /* 深橙色 */
+    background-color: #2E8B57 !important; /* 海洋绿 (SeaGreen) */
     color: white !important;
 }
-/* 适配橙年底色，将标签上的关闭按钮改成白色 */
+/* 适配绿底色，将标签上的关闭按钮改成白色 */
 span[data-baseweb="tag"] svg {
     fill: white !important;
 }
@@ -72,12 +72,15 @@ if 'model_name' not in st.session_state:
 if 'usage_count' not in st.session_state:
     st.session_state.usage_count = 0  # 记录使用次数统计
 
-# ================= 后台管理 (侧边栏) =================
-with st.sidebar:
-    st.header("⚙️ 后台管理中心")
+# ================= 独立后台通道 (隐藏暗门) =================
+# 通过网址后缀 ?admin=true 进入此后台
+is_admin_mode = st.query_params.get("admin") == "true"
+
+if is_admin_mode:
+    st.title("⚙️ 系统后台管理中心")
     if not st.session_state.admin_logged_in:
         pwd = st.text_input("请输入管理员密码", type="password")
-        if st.button("登录后台"):
+        if st.button("登录后台", type="primary"):
             if pwd == "888888":  # 这里可以修改您的专属后台密码
                 st.session_state.admin_logged_in = True
                 st.success("登录成功！")
@@ -85,18 +88,39 @@ with st.sidebar:
             else:
                 st.error("密码错误！")
     else:
-        st.success("管理员已登录")
+        st.success("✅ 管理员已授权登录")
         
-        # --- 新增：使用情况统计 ---
-        st.markdown("### 📊 使用情况 (云端实例)")
+        st.markdown("### 📊 本次运行实例数据")
         st.metric(label="累计成功推演生成次数", value=st.session_state.usage_count)
         st.divider()
         
-        # --- 优化：AI模型下拉菜单 ---
-        st.markdown("### 🤖 AI 接口配置")
-        st.session_state.api_base = st.text_input("接口地址 (Base URL)", value=st.session_state.api_base)
+        st.markdown("### 🤖 AI 接口统一配置")
+        
+        # 1. 接口地址(Base URL) 下拉菜单
+        common_bases = [
+            "https://api.openai.com/v1",
+            "https://api.deepseek.com/v1",
+            "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "https://api.moonshot.cn/v1",
+            "http://localhost:1234/v1",
+            "自定义其他地址..."
+        ]
+        curr_base = st.session_state.api_base
+        try:
+            b_idx = common_bases.index(curr_base)
+        except ValueError:
+            b_idx = len(common_bases) - 1
+            
+        selected_base = st.selectbox("选择接口地址 (Base URL)", common_bases, index=b_idx)
+        if selected_base == "自定义其他地址...":
+            st.session_state.api_base = st.text_input("手动输入接口地址", value=curr_base)
+        else:
+            st.session_state.api_base = selected_base
+
+        # 2. 密钥设置
         st.session_state.api_key = st.text_input("API 密钥 (API Key)", value=st.session_state.api_key, type="password")
         
+        # 3. 模型名称 下拉菜单
         common_models = [
             "gpt-4o", "gpt-3.5-turbo", 
             "deepseek-chat", "deepseek-reasoner", 
@@ -105,25 +129,28 @@ with st.sidebar:
             "自定义其他模型..."
         ]
         curr_model = st.session_state.model_name
-        
         try:
-            idx = common_models.index(curr_model)
+            m_idx = common_models.index(curr_model)
         except ValueError:
-            idx = len(common_models) - 1
+            m_idx = len(common_models) - 1
             
-        selected_model = st.selectbox("选择模型名称 (Model)", common_models, index=idx)
-        
+        selected_model = st.selectbox("选择模型名称 (Model)", common_models, index=m_idx)
         if selected_model == "自定义其他模型...":
             st.session_state.model_name = st.text_input("手动输入模型名称", value=curr_model)
         else:
             st.session_state.model_name = selected_model
         
-        if st.button("退出登录"):
+        st.divider()
+        if st.button("保存并退出后台"):
             st.session_state.admin_logged_in = False
             st.rerun()
+            
+    # 如果处于后台模式，渲染完后台界面后直接终止程序，不显示前端用户界面
+    st.stop()
 
-# ================= 前端主界面 (用户端) =================
-# 替换原有的原生 title，使用注入样式的 HTML 渲染大标题
+
+# ================= 前端主界面 (用户端纯净版) =================
+# 原有侧边栏已彻底删除，只保留用户核心功能
 st.markdown('<div class="main-title">🌟 名字通 - 国学起名系统 v3.0</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-title-desc">融合传统周易八卦、五行生克与现代 AI 智能的前沿起名引擎。</div>', unsafe_allow_html=True)
 
@@ -277,7 +304,7 @@ def generate_word_doc(content, bazi_info):
 st.divider()
 if st.button("🚀 连接 AI 开始推演方案", type="primary", use_container_width=True):
     if not st.session_state.api_key:
-        st.warning("⚠️ 管理员尚未配置 API 密钥，请先在左侧后台管理中心进行设置！")
+        st.warning("⚠️ 接口暂未打通，请联系管理员配置。")
     else:
         with st.spinner("算力运转中，正在为您结合八字与国学全力推演，请稍候..."):
             try:
@@ -336,4 +363,4 @@ if st.button("🚀 连接 AI 开始推演方案", type="primary", use_container_
                 )
                 
             except Exception as e:
-                st.error(f"❌ 生成失败，请联系管理员检查后台配置或网络。详细报错：{e}")
+                st.error(f"❌ 生成失败，请联系管理员检查配置或网络。详细报错：{e}")
