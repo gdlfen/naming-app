@@ -6,7 +6,7 @@ import io
 import base64
 from datetime import datetime
 from docx import Document
-from docx.shared import Pt, RGBColor
+from docx.shared import Pt, RGBColor, Inches
 from docx.oxml.ns import qn
 from docx.oxml.shared import OxmlElement
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT, WD_LINE_SPACING
@@ -96,7 +96,6 @@ if 'admin_logged_in' not in st.session_state:
     st.session_state.admin_logged_in = False
 
 # ================= 独立后台通道 (隐藏暗门) =================
-# 通过网址后缀 ?admin=true 进入此后台
 is_admin_mode = st.query_params.get("admin") == "true"
 
 if is_admin_mode:
@@ -104,7 +103,7 @@ if is_admin_mode:
     if not st.session_state.admin_logged_in:
         pwd = st.text_input("请输入管理员密码", type="password")
         if st.button("登录后台", type="primary"):
-            if pwd == "888888":  # 这里可以修改您的专属后台密码
+            if pwd == "888888":  
                 st.session_state.admin_logged_in = True
                 st.success("登录成功！")
                 st.rerun()
@@ -119,7 +118,6 @@ if is_admin_mode:
         
         st.markdown("### 🤖 AI 接口统一配置")
         
-        # 1. 接口地址(Base URL) 下拉菜单
         common_bases = [
             "https://api.openai.com/v1",
             "https://api.deepseek.com/v1",
@@ -140,10 +138,8 @@ if is_admin_mode:
         else:
             new_api_base = selected_base
 
-        # 2. 密钥设置
         new_api_key = st.text_input("API 密钥 (API Key)", value=global_config.get("api_key", ""), type="password")
         
-        # 3. 模型名称 下拉菜单
         common_models = [
             "gpt-4o", "gpt-3.5-turbo", 
             "deepseek-chat", "deepseek-reasoner", 
@@ -165,7 +161,6 @@ if is_admin_mode:
         
         st.divider()
         if st.button("保存配置并退出后台", type="primary"):
-            # 将新的配置写入物理文件
             global_config["api_base"] = new_api_base
             global_config["api_key"] = new_api_key
             global_config["model_name"] = new_model_name
@@ -174,7 +169,6 @@ if is_admin_mode:
             st.session_state.admin_logged_in = False
             st.success("配置已成功保存！请去掉网址后缀的 ?admin=true 返回前台。")
             
-    # 如果处于后台模式，渲染完后台界面后直接终止程序，不显示前端用户界面
     st.stop()
 
 
@@ -217,7 +211,6 @@ selected_prefs = st.multiselect("风格偏好 (可多选)", all_prefs, default=[
 
 c3, c4 = st.columns(2)
 with c3: name_length = st.text_input("名字字数要求", value="3字")
-# 解除了个数上限，去掉了 max_value 参数
 with c4: name_count = st.number_input("生成方案个数", min_value=1, value=5)
 other_req = st.text_area("其他补充要求 (如希望名字大气、避免生僻字;  特定的字辈、避免的字等)")
 
@@ -244,8 +237,10 @@ def get_bazi_info():
     except Exception:
         return f"日期解析异常 ({gender_str})"
 
+
 def generate_word_doc(content, bazi_info):
     doc = Document()
+    # 统一全局字体为更高级的微软雅黑，11磅
     style = doc.styles['Normal']
     style.font.name = 'Microsoft YaHei'
     style._element.rPr.rFonts.set(qn('w:eastAsia'), 'Microsoft YaHei')
@@ -260,6 +255,7 @@ def generate_word_doc(content, bazi_info):
     color_map = {'木': RGBColor(0, 128, 0), '火': RGBColor(255, 0, 0), '土': RGBColor(255, 255, 0), '金': RGBColor(255, 255, 255), '水': RGBColor(0, 0, 0)}
     hex_map = {'木': 'E8F5E9', '火': 'FFEBEE', '土': 'FFF9C4', '金': 'F5F5F5', '水': 'E0E0E0'}
 
+    # 封面大标题
     title_text = "个人专属起名策划方案" if mode == "为人起名" else "公司品牌起名策划方案"
     title_para = doc.add_paragraph()
     title_para.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
@@ -286,51 +282,98 @@ def generate_word_doc(content, bazi_info):
     time_para.runs[0].font.size = Pt(10)
     time_para.runs[0].font.color.rgb = RGBColor(128, 128, 128)
 
+    # 核心排版引擎升级：美观高档
     for line in content.split('\n'):
         line = line.strip()
-        # 清洗掉网页版花里胡哨的HTML标签，防止Word排版报错
-        line = re.sub(r'<[^>]+>', '', line)
+        line = re.sub(r'<[^>]+>', '', line) # 清洗 HTML 标签
         if not line: continue
         
         p = doc.add_paragraph()
-        if "第一部分" in line or "第二部分" in line:
+        p.paragraph_format.line_spacing = 1.5 # 舒适的1.5倍行距
+        
+        if line.startswith("第一部分") or line.startswith("第二部分"):
+            p.paragraph_format.space_before = Pt(20)
+            p.paragraph_format.space_after = Pt(10)
             run = p.add_run(line)
             run.font.size = Pt(16)
             run.font.bold = True
-            run.font.color.rgb = RGBColor(0, 102, 204)
+            run.font.color.rgb = RGBColor(44, 62, 80) # 高级深沉蓝灰色
+            
             if "第一部分" in line:
+                # 给八字加上高级的浅褐色底纹边框效果
                 doc.add_paragraph("")
                 bazi_para = doc.add_paragraph(bazi_info)
                 bazi_para.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                bazi_para.paragraph_format.space_before = Pt(10)
+                bazi_para.paragraph_format.space_after = Pt(10)
+                
+                bazi_pPr = bazi_para._element.get_or_add_pPr()
+                bazi_shd = OxmlElement('w:shd')
+                bazi_shd.set(qn('w:val'), 'clear')
+                bazi_shd.set(qn('w:color'), 'auto')
+                bazi_shd.set(qn('w:fill'), 'F9EBEA') # 典雅浅褐色背景
+                bazi_pPr.append(bazi_shd)
+
                 run_bazi = bazi_para.runs[0]
                 run_bazi.font.size = Pt(12)
                 run_bazi.font.bold = True
-                run_bazi.font.color.rgb = RGBColor(139, 69, 19)
+                run_bazi.font.color.rgb = RGBColor(139, 69, 19) # 马鞍棕色
                 doc.add_paragraph("")
+                
         elif line.startswith("【") and "方案" in line:
+            # 方案大标题
+            p.paragraph_format.space_before = Pt(15)
+            p.paragraph_format.space_after = Pt(5)
             run = p.add_run(line)
-            run.font.size = Pt(14)
+            run.font.size = Pt(15)
             run.font.bold = True
-            run.font.color.rgb = RGBColor(204, 102, 0)
-        elif any(line.startswith(f"{i}.") for i in range(1, 8)):
-            parts = line.split("：", 1)
+            run.font.color.rgb = RGBColor(178, 34, 34) # 砖红色，极具国学高级感
+            
+        elif re.match(r'^\d+\.', line):
+            # 类似 "1. 拼音：" 的主列表：缩进、加粗标头
+            p.paragraph_format.left_indent = Pt(14)
+            p.paragraph_format.space_after = Pt(4)
+            parts = re.split(r'：|:', line, 1)
             if len(parts) == 2:
-                p.add_run(parts[0] + "：").font.bold = True
-                p.runs[0].font.color.rgb = RGBColor(34, 139, 34)
-                p.add_run(parts[1])
+                r1 = p.add_run(parts[0] + "：")
+                r1.font.bold = True
+                r1.font.color.rgb = RGBColor(39, 174, 96) # 典雅翡翠绿
+                r2 = p.add_run(parts[1])
+                r2.font.color.rgb = RGBColor(50, 50, 50) # 深灰色代替纯黑，更柔和
             else:
-                p.add_run(line)
+                r = p.add_run(line)
+                r.font.color.rgb = RGBColor(50, 50, 50)
+                
+        elif line.startswith("- "):
+            # 类似 "- 核心名数理分析：" 的子列表：二级阶梯缩进
+            p.paragraph_format.left_indent = Pt(28)
+            p.paragraph_format.space_after = Pt(4)
+            parts = re.split(r'：|:', line, 1)
+            if len(parts) == 2:
+                r1 = p.add_run(parts[0] + "：")
+                r1.font.bold = True
+                r1.font.color.rgb = RGBColor(139, 69, 19) # 次级强调色：古铜色
+                r2 = p.add_run(parts[1])
+                r2.font.color.rgb = RGBColor(60, 60, 60)
+            else:
+                r = p.add_run(line)
+                r.font.color.rgb = RGBColor(60, 60, 60)
+                
         else:
-            p.add_run(line)
+            # 普通正文
+            p.paragraph_format.space_after = Pt(6)
+            r = p.add_run(line)
+            r.font.color.rgb = RGBColor(60, 60, 60)
 
-    disclaimer = doc.add_paragraph("\n[ 注：本起名方案仅供参考 ]")
+    disclaimer = doc.add_paragraph("\n[ 注：本起名策划方案系依据传统国学经典推演，仅供参考 ]")
     disclaimer.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
     disclaimer.runs[0].font.size = Pt(10)
-    disclaimer.runs[0].font.color.rgb = RGBColor(128, 128, 128)
+    disclaimer.runs[0].font.color.rgb = RGBColor(150, 150, 150)
     
     bio = io.BytesIO()
     doc.save(bio)
     return bio
+
 
 # 生成按钮
 st.divider()
@@ -348,7 +391,6 @@ if st.button("🚀 连接 AI 开始推演方案", type="primary", use_container_
                 prompt += f"【背景信息】\n- 性别：{gender}\n- 出生时间与八字：\n{bazi_info}\n"
                 prompt += "（请在第一部分采用最正宗、最权威、最精确的传统子平八字命理体系，综合日元旺衰、格局分析、调候通关等，给出深度专业的五行用神、忌神喜忌分析）\n"
 
-                # 提取数字，防止用户输入带汉字
                 num_match = re.search(r'\d+', name_length)
                 n_total = int(num_match.group()) if num_match else 3
                 
@@ -356,7 +398,6 @@ if st.button("🚀 连接 AI 开始推演方案", type="primary", use_container_
                     prompt += f"- 起名类型：个人起名\n- 姓氏：{surname}\n"
                     if birth_place: prompt += f"- 出生地：{birth_place}\n"
                     
-                    # 【核心修复1】：强化严密的字数数学推导指令，防止AI起名长度错乱
                     surname_len = len(surname) if surname else 1
                     n_names = max(1, n_total - surname_len)
                     mask_chars = "〇" * n_names
@@ -382,7 +423,11 @@ if st.button("🚀 连接 AI 开始推演方案", type="primary", use_container_
                 prompt += "2. 颜色匹配原则：木用绿色(#2E8B57)，火用红色(#B22222)，土用棕黄(#B8860B)，金用金色(#DAA520)，水用蓝色(#1E90FF)。\n"
                 prompt += "3. 长段落排版要层次分明、采用无序列表或区块引用。\n"
                 
-                prompt += f"\n【输出任务】\n生成 {name_count} 个方案。必须严格按以下子标题结构输出（不可省略序号）：\n"
+                # 【强化版】：强制防止断流，确保方案个数 100% 达标
+                prompt += f"\n【⚠️ 特别警告：完整性要求】\n"
+                prompt += f"本次请求生成的方案数量为 {name_count} 个。请你务必分配好输出篇幅，**绝对保证从“方案一”完整输出到“方案{name_count}”**，绝不允许中途截断或省略！如果内容较多，请精简“典故”和“寓意”的字数，但必须保证总数达到 {name_count} 个。\n\n"
+                
+                prompt += "必须严格按以下子标题结构输出（不可省略序号）：\n"
                 prompt += "第一部分：五行喜忌分析\n"
                 prompt += "第二部分：起名方案\n"
                 prompt += "【方案一：XXX】\n"
@@ -400,12 +445,13 @@ if st.button("🚀 连接 AI 开始推演方案", type="primary", use_container_
                 prompt += "5. 典故：\n"
                 prompt += "6. 寓意：\n"
 
-                # 调用 API
+                # 调用 API，强制开启极大的 max_tokens 以防止截断
                 client = OpenAI(api_key=global_config["api_key"], base_url=global_config["api_base"])
                 response = client.chat.completions.create(
                     model=global_config["model_name"],
                     messages=[{"role": "user", "content": prompt}],
-                    temperature=0.7
+                    temperature=0.7,
+                    max_tokens=8192  # 给足 Token 余量，防止生成 50 个方案时被强行掐断
                 )
                 
                 ai_content = response.choices[0].message.content
@@ -423,7 +469,6 @@ if st.button("🚀 连接 AI 开始推演方案", type="primary", use_container_
                 word_file = generate_word_doc(ai_content, bazi_info)
                 filename = f"起名策划方案_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
                 
-                # 恢复原生 Word 的 MIME 格式
                 st.download_button(
                     label="📥 保存为 Word 策划方案文档 (推荐)",
                     data=word_file.getvalue(),
@@ -432,9 +477,9 @@ if st.button("🚀 连接 AI 开始推演方案", type="primary", use_container_
                     use_container_width=True
                 )
                 
-                # 【核心修复2】：专为微信/安卓浏览器开发的 Base64 原生强制下载通道
+                # 专为微信/安卓浏览器开发的 Base64 原生强制下载通道
                 b64 = base64.b64encode(word_file.getvalue()).decode()
-                href = f'<a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{b64}" download="{filename}" style="display: block; width: 100%; text-align: center; padding: 10px; margin-top: 5px; background-color: #f0f2f6; color: #1E90FF; border-radius: 8px; text-decoration: none; font-weight: bold; border: 1px solid #d5dce5;">📲 备用直连下载通道（专供手机浏览器）</a>'
+                href = f'<a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{b64}" download="{filename}" style="display: block; width: 100%; text-align: center; padding: 12px; margin-top: 5px; background-color: #f0f2f6; color: #1E90FF; border-radius: 8px; text-decoration: none; font-weight: bold; border: 1px solid #d5dce5; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">📲 备用直连下载通道（专供手机端）</a>'
                 st.markdown(href, unsafe_allow_html=True)
                 
             except Exception as e:
