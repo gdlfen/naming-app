@@ -178,7 +178,7 @@ if is_admin_mode:
 
 
 # ================= 前端主界面 (用户端纯净版) =================
-st.markdown('<div class="main-title">🌟 名字通 - 国学起名系统 v3.0</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-title">🌟 名正言顺 - 国学起名系统 v3.0</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-title-desc">融合传统周易八卦、五行生克与现代 AI 智能的前沿起名引擎。</div>', unsafe_allow_html=True)
 
 # 1. 基础信息填写
@@ -217,7 +217,7 @@ selected_prefs = st.multiselect("风格偏好 (可多选)", all_prefs, default=[
 c3, c4 = st.columns(2)
 with c3: name_length = st.text_input("名字字数要求", value="3字")
 with c4: name_count = st.number_input("生成方案个数", min_value=1, max_value=10, value=5)
-other_req = st.text_area("其他补充要求 (如特定的字辈、避免的字等)")
+other_req = st.text_area("其他补充要求 (如希望名字大气、避免生僻字;特定的字辈、避免的字等)")
 
 
 # ================= 核心推演逻辑 =================
