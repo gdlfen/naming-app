@@ -46,7 +46,7 @@ def save_global_config(config_dict):
 global_config = load_global_config()
 
 # ================= 页面基础设置 =================
-st.set_page_config(page_title="名字通（国学起名系统）", layout="centered", page_icon="🌟")
+st.set_page_config(page_title="名正言顺", layout="centered", page_icon="🌟")
 
 # 注入自定义 CSS：强制覆盖生效
 st.markdown("""
@@ -217,7 +217,7 @@ selected_prefs = st.multiselect("风格偏好 (可多选)", all_prefs, default=[
 c3, c4 = st.columns(2)
 with c3: name_length = st.text_input("名字字数要求", value="3字")
 with c4: name_count = st.number_input("生成方案个数", min_value=1, max_value=10, value=5)
-other_req = st.text_area("其他补充要求 (如希望名字大气、避免生僻字;特定的字辈、避免的字等)")
+other_req = st.text_area("其他补充要求 (如希望名字大气、避免生僻字;  特定的字辈、避免的字等)")
 
 
 # ================= 核心推演逻辑 =================
@@ -286,7 +286,10 @@ def generate_word_doc(content, bazi_info):
 
     for line in content.split('\n'):
         line = line.strip()
+        # 清洗掉网页版花里胡哨的HTML标签，防止Word排版报错
+        line = re.sub(r'<[^>]+>', '', line)
         if not line: continue
+        
         p = doc.add_paragraph()
         if "第一部分" in line or "第二部分" in line:
             run = p.add_run(line)
@@ -307,7 +310,7 @@ def generate_word_doc(content, bazi_info):
             run.font.size = Pt(14)
             run.font.bold = True
             run.font.color.rgb = RGBColor(204, 102, 0)
-        elif any(line.startswith(f"{i}.") for i in range(1, 7)):
+        elif any(line.startswith(f"{i}.") for i in range(1, 8)):
             parts = line.split("：", 1)
             if len(parts) == 2:
                 p.add_run(parts[0] + "：").font.bold = True
@@ -330,7 +333,6 @@ def generate_word_doc(content, bazi_info):
 # 生成按钮
 st.divider()
 if st.button("🚀 连接 AI 开始推演方案", type="primary", use_container_width=True):
-    # 这里改为读取全局配置字典中的 key
     if not global_config.get("api_key"):
         st.warning("⚠️ 接口暂未打通，请联系管理员配置。")
     else:
@@ -340,7 +342,9 @@ if st.button("🚀 连接 AI 开始推演方案", type="primary", use_container_
                 
                 # 构造 Prompt
                 prompt = "你是一个精通中国传统文化、周易八卦、五行生克、三才五格数理、诗词歌赋的资深国学起名大师。\n\n"
-                prompt += f"【背景信息】\n- 性别：{gender}\n- 出生时间与八字：\n{bazi_info}\n（请在第一部分结合性别给出详细的五行喜忌分析）\n"
+                
+                prompt += f"【背景信息】\n- 性别：{gender}\n- 出生时间与八字：\n{bazi_info}\n"
+                prompt += "（请在第一部分采用最正宗、最权威、最精确的传统子平八字命理体系，综合日元旺衰、格局分析、调候通关等，给出深度专业的五行用神、忌神喜忌分析）\n"
 
                 num_match = re.search(r'\d+', name_length)
                 n_total = int(num_match.group()) if num_match else 3
@@ -355,12 +359,40 @@ if st.button("🚀 连接 AI 开始推演方案", type="primary", use_container_
                     prompt += f"\n【⚠️ 核心铁律】\n1. 总汉字数必须绝对等于 {n_total} 个汉字！\n2. 强制填空：名字必须完全填入模板【 {template_mask} 】。\n"
                 else:
                     prompt += f"- 起名类型：公司/品牌起名\n- 行业及经营范围：{comp_industry}\n"
-                    if comp_prefix or comp_suffix: prompt += f"- 结构：{comp_prefix} + [核心名字] + {comp_suffix}\n"
+                    if comp_prefix or comp_suffix: 
+                        prompt += f"- 结构：{comp_prefix} + [核心商号] + {comp_suffix}\n"
+                        # 强调数理双重分析要求
+                        prompt += "【极其重要】：在公司起名中，必须同时独立测算“核心名”和“公司全称”的数理吉凶！不能混为一谈。\n"
                     prompt += f"\n【⚠️ 核心铁律】\n1. 核心商号必须绝对等于 {n_total} 个汉字！\n2. 强制填空：必须完全填入模板【 {'〇' * n_total} 】。\n"
 
                 prompt += f"【偏好要求】\n- 勾选要求：{', '.join(selected_prefs)}\n- 补充要求：{other_req}\n"
                 prompt += "\n【五行颜色底层指令提取】\n请在整篇回答的最开头（第一行），原封不动输出：\n【五行色彩：喜=X，忌=Y】（X和Y替换为单字，勿带其他文字）。\n"
-                prompt += f"\n【输出任务】\n生成 {name_count} 个方案。严格按以下结构：\n第一部分：五行喜忌分析\n第二部分：起名方案\n【方案一：XXX】\n1. 拼音：\n2. 五行：\n3. 数理：\n4. 音韵：\n5. 典故：\n6. 寓意：\n"
+                
+                prompt += "\n【排版与视觉美学指令】\n"
+                prompt += "为了使输出结果在手机和电脑端网页显示和谐美观，请严格使用 Markdown 和 HTML 标签进行排版优化：\n"
+                prompt += "1. 请使用 <span style='color: #特定颜色; font-weight: bold;'> 标签包裹关键属性（如五行、分数等）。\n"
+                prompt += "2. 颜色匹配原则：木用绿色(#2E8B57)，火用红色(#B22222)，土用棕黄(#B8860B)，金用金色(#DAA520)，水用蓝色(#1E90FF)。\n"
+                prompt += "3. 长段落排版要层次分明、采用无序列表或区块引用。\n"
+                
+                # 【终极强制修改：动态模板生成，强制分离数理分析】
+                prompt += f"\n【输出任务】\n生成 {name_count} 个方案。必须严格按以下子标题结构输出（不可省略序号）：\n"
+                prompt += "第一部分：五行喜忌分析\n"
+                prompt += "第二部分：起名方案\n"
+                prompt += "【方案一：XXX】\n"
+                prompt += "1. 拼音：\n"
+                prompt += "2. 五行：\n"
+                
+                # 如果是公司，强制把它拆成两个独立的强制点让 AI 填空
+                if mode == "为公司起名" and (comp_prefix or comp_suffix):
+                    prompt += "3. 数理分析（必须分别独立作答）：\n"
+                    prompt += "   - 核心名数理分析（仅测算核心名的笔画吉凶与评分）：\n"
+                    prompt += f"   - 公司全称数理分析（整体测算“{comp_prefix} + 核心名 + {comp_suffix}”的笔画吉凶与评分）：\n"
+                else:
+                    prompt += "3. 数理：\n"
+                    
+                prompt += "4. 音韵：\n"
+                prompt += "5. 典故：\n"
+                prompt += "6. 寓意：\n"
 
                 # 调用 API (使用全局配置)
                 client = OpenAI(api_key=global_config["api_key"], base_url=global_config["api_base"])
@@ -378,7 +410,9 @@ if st.button("🚀 连接 AI 开始推演方案", type="primary", use_container_
                 global_config["usage_count"] = global_config.get("usage_count", 0) + 1
                 save_global_config(global_config)
                 
-                st.markdown(ai_content.replace(re.search(r'【五行色彩：喜=.*，忌=.*】', ai_content).group(0), '') if re.search(r'【五行色彩：喜=.*，忌=.*】', ai_content) else ai_content)
+                # 剔除底层五行指令，开启 unsafe_allow_html 使网页彩色排版生效
+                clean_html_content = ai_content.replace(re.search(r'【五行色彩：喜=.*，忌=.*】', ai_content).group(0), '') if re.search(r'【五行色彩：喜=.*，忌=.*】', ai_content) else ai_content
+                st.markdown(clean_html_content, unsafe_allow_html=True)
 
                 # 生成 Word 内存文件并提供下载
                 word_file = generate_word_doc(ai_content, bazi_info)
