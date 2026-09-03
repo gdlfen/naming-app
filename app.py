@@ -332,7 +332,7 @@ def generate_word_doc(content, bazi_info):
 
 # 生成按钮
 st.divider()
-if st.button("🚀 连接 AI 开始推演方案", type="primary", use_container_width=True):
+if st.button("🚀开始推演方案", type="primary", use_container_width=True):
     if not global_config.get("api_key"):
         st.warning("⚠️ 接口暂未打通，请联系管理员配置。")
     else:
