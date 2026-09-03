@@ -217,7 +217,8 @@ selected_prefs = st.multiselect("风格偏好 (可多选)", all_prefs, default=[
 
 c3, c4 = st.columns(2)
 with c3: name_length = st.text_input("名字字数要求", value="3字")
-with c4: name_count = st.number_input("生成方案个数", min_value=1, max_value=10, value=5)
+# 解除了个数上限，去掉了 max_value 参数
+with c4: name_count = st.number_input("生成方案个数", min_value=1, value=5)
 other_req = st.text_area("其他补充要求 (如希望名字大气、避免生僻字;  特定的字辈、避免的字等)")
 
 
@@ -333,7 +334,7 @@ def generate_word_doc(content, bazi_info):
 
 # 生成按钮
 st.divider()
-if st.button("🚀 开始启动", type="primary", use_container_width=True):
+if st.button("🚀 连接 AI 开始推演方案", type="primary", use_container_width=True):
     if not global_config.get("api_key"):
         st.warning("⚠️ 接口暂未打通，请联系管理员配置。")
     else:
