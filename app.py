@@ -361,7 +361,6 @@ if st.button("🚀 连接 AI 开始推演方案", type="primary", use_container_
                     prompt += f"- 起名类型：公司/品牌起名\n- 行业及经营范围：{comp_industry}\n"
                     if comp_prefix or comp_suffix: 
                         prompt += f"- 结构：{comp_prefix} + [核心商号] + {comp_suffix}\n"
-                        # 强调数理双重分析要求
                         prompt += "【极其重要】：在公司起名中，必须同时独立测算“核心名”和“公司全称”的数理吉凶！不能混为一谈。\n"
                     prompt += f"\n【⚠️ 核心铁律】\n1. 核心商号必须绝对等于 {n_total} 个汉字！\n2. 强制填空：必须完全填入模板【 {'〇' * n_total} 】。\n"
 
@@ -374,7 +373,6 @@ if st.button("🚀 连接 AI 开始推演方案", type="primary", use_container_
                 prompt += "2. 颜色匹配原则：木用绿色(#2E8B57)，火用红色(#B22222)，土用棕黄(#B8860B)，金用金色(#DAA520)，水用蓝色(#1E90FF)。\n"
                 prompt += "3. 长段落排版要层次分明、采用无序列表或区块引用。\n"
                 
-                # 【终极强制修改：动态模板生成，强制分离数理分析】
                 prompt += f"\n【输出任务】\n生成 {name_count} 个方案。必须严格按以下子标题结构输出（不可省略序号）：\n"
                 prompt += "第一部分：五行喜忌分析\n"
                 prompt += "第二部分：起名方案\n"
@@ -382,7 +380,6 @@ if st.button("🚀 连接 AI 开始推演方案", type="primary", use_container_
                 prompt += "1. 拼音：\n"
                 prompt += "2. 五行：\n"
                 
-                # 如果是公司，强制把它拆成两个独立的强制点让 AI 填空
                 if mode == "为公司起名" and (comp_prefix or comp_suffix):
                     prompt += "3. 数理分析（必须分别独立作答）：\n"
                     prompt += "   - 核心名数理分析（仅测算核心名的笔画吉凶与评分）：\n"
@@ -394,7 +391,7 @@ if st.button("🚀 连接 AI 开始推演方案", type="primary", use_container_
                 prompt += "5. 典故：\n"
                 prompt += "6. 寓意：\n"
 
-                # 调用 API (使用全局配置)
+                # 调用 API
                 client = OpenAI(api_key=global_config["api_key"], base_url=global_config["api_base"])
                 response = client.chat.completions.create(
                     model=global_config["model_name"],
@@ -404,17 +401,19 @@ if st.button("🚀 连接 AI 开始推演方案", type="primary", use_container_
                 
                 ai_content = response.choices[0].message.content
                 
-                # 页面展示并更新使用次数
                 st.success("✅ 推演成功！")
                 
                 global_config["usage_count"] = global_config.get("usage_count", 0) + 1
                 save_global_config(global_config)
                 
-                # 剔除底层五行指令，开启 unsafe_allow_html 使网页彩色排版生效
                 clean_html_content = ai_content.replace(re.search(r'【五行色彩：喜=.*，忌=.*】', ai_content).group(0), '') if re.search(r'【五行色彩：喜=.*，忌=.*】', ai_content) else ai_content
                 st.markdown(clean_html_content, unsafe_allow_html=True)
 
-                # 生成 Word 内存文件并提供下载
+                # ==========================================
+                # 修改点：加入防拦截提示，且更改了 MIME type
+                # ==========================================
+                st.info("💡 手机端如遇无法下载文件，请点击屏幕右上角选择【在浏览器中打开】后再试。")
+                
                 word_file = generate_word_doc(ai_content, bazi_info)
                 filename = f"起名策划方案_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
                 
@@ -422,7 +421,8 @@ if st.button("🚀 连接 AI 开始推演方案", type="primary", use_container_
                     label="📥 保存为 Word 策划方案文档",
                     data=word_file.getvalue(),
                     file_name=filename,
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    # 强制使用二进制流 MIME type，逼迫安卓手机弹出下载框
+                    mime="application/octet-stream",
                     use_container_width=True
                 )
                 
