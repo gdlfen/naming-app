@@ -3,6 +3,7 @@ import os
 import re
 import json
 import io
+import base64
 from datetime import datetime
 from docx import Document
 from docx.shared import Pt, RGBColor
@@ -332,7 +333,7 @@ def generate_word_doc(content, bazi_info):
 
 # 生成按钮
 st.divider()
-if st.button("🚀开始启动", type="primary", use_container_width=True):
+if st.button("🚀 开始启动", type="primary", use_container_width=True):
     if not global_config.get("api_key"):
         st.warning("⚠️ 接口暂未打通，请联系管理员配置。")
     else:
@@ -346,17 +347,24 @@ if st.button("🚀开始启动", type="primary", use_container_width=True):
                 prompt += f"【背景信息】\n- 性别：{gender}\n- 出生时间与八字：\n{bazi_info}\n"
                 prompt += "（请在第一部分采用最正宗、最权威、最精确的传统子平八字命理体系，综合日元旺衰、格局分析、调候通关等，给出深度专业的五行用神、忌神喜忌分析）\n"
 
+                # 提取数字，防止用户输入带汉字
                 num_match = re.search(r'\d+', name_length)
                 n_total = int(num_match.group()) if num_match else 3
                 
                 if mode == "为人起名":
                     prompt += f"- 起名类型：个人起名\n- 姓氏：{surname}\n"
                     if birth_place: prompt += f"- 出生地：{birth_place}\n"
+                    
+                    # 【核心修复1】：强化严密的字数数学推导指令，防止AI起名长度错乱
                     surname_len = len(surname) if surname else 1
                     n_names = max(1, n_total - surname_len)
                     mask_chars = "〇" * n_names
                     template_mask = f"{surname}{mask_chars}"
-                    prompt += f"\n【⚠️ 核心铁律】\n1. 总汉字数必须绝对等于 {n_total} 个汉字！\n2. 强制填空：名字必须完全填入模板【 {template_mask} 】。\n"
+                    
+                    prompt += f"\n【⚠️ 严密字数核心铁律 - 绝不允许出错！】\n"
+                    prompt += f"1. 包含姓氏在内，全名总字数必须严格等于 {n_total} 个汉字！\n"
+                    prompt += f"2. 因为姓氏“{surname}”占 {surname_len} 个字，所以你起的名字（不含姓氏）只能是 {n_names} 个字！\n"
+                    prompt += f"3. 强制填空：名字必须完美填入模板【 {template_mask} 】（将〇替换为你起的字），多一个字、少一个字都将被判定为失败。\n"
                 else:
                     prompt += f"- 起名类型：公司/品牌起名\n- 行业及经营范围：{comp_industry}\n"
                     if comp_prefix or comp_suffix: 
@@ -409,22 +417,24 @@ if st.button("🚀开始启动", type="primary", use_container_width=True):
                 clean_html_content = ai_content.replace(re.search(r'【五行色彩：喜=.*，忌=.*】', ai_content).group(0), '') if re.search(r'【五行色彩：喜=.*，忌=.*】', ai_content) else ai_content
                 st.markdown(clean_html_content, unsafe_allow_html=True)
 
-                # ==========================================
-                # 修改点：加入防拦截提示，且更改了 MIME type
-                # ==========================================
-                st.info("💡 手机端如遇无法下载文件，请点击屏幕右上角选择【在浏览器中打开】后再试。")
+                st.info("💡 提示：如遇部分手机浏览器点击下方下载按钮无反应，请使用下方的【📲 备用直连下载通道】。")
                 
                 word_file = generate_word_doc(ai_content, bazi_info)
                 filename = f"起名策划方案_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
                 
+                # 恢复原生 Word 的 MIME 格式
                 st.download_button(
-                    label="📥 保存为 Word 策划方案文档",
+                    label="📥 保存为 Word 策划方案文档 (推荐)",
                     data=word_file.getvalue(),
                     file_name=filename,
-                    # 强制使用二进制流 MIME type，逼迫安卓手机弹出下载框
-                    mime="application/octet-stream",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     use_container_width=True
                 )
+                
+                # 【核心修复2】：专为微信/安卓浏览器开发的 Base64 原生强制下载通道
+                b64 = base64.b64encode(word_file.getvalue()).decode()
+                href = f'<a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{b64}" download="{filename}" style="display: block; width: 100%; text-align: center; padding: 10px; margin-top: 5px; background-color: #f0f2f6; color: #1E90FF; border-radius: 8px; text-decoration: none; font-weight: bold; border: 1px solid #d5dce5;">📲 备用直连下载通道（专供手机浏览器）</a>'
+                st.markdown(href, unsafe_allow_html=True)
                 
             except Exception as e:
                 st.error(f"❌ 生成失败，请联系管理员检查配置或网络。详细报错：{e}")
