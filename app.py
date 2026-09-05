@@ -118,20 +118,12 @@ if is_admin_mode:
         
         st.markdown("### 🤖 AI 接口统一配置")
         
-        # 1. 接口地址(Base URL) 下拉菜单（集成云端与主流本地 AI 服务类型）
         common_bases = [
-            # 常见云端商用接口
             "https://api.openai.com/v1",
             "https://api.deepseek.com/v1",
             "https://dashscope.aliyuncs.com/compatible-mode/v1",
             "https://api.moonshot.cn/v1",
-            # 本地常用 AI 运行框架及对应端口
-            "http://localhost:11434/v1",  # Ollama 本地默认
-            "http://localhost:1234/v1",   # LM Studio 本地默认
-            "http://localhost:8000/v1",   # vLLM / FastChat 本地默认
-            "http://localhost:9997/v1",   # Xinference 本地默认
-            "http://localhost:5000/v1",   # Text-Gen-WebUI 本地默认
-            "http://localhost:8080/v1",   # LocalAI 本地默认
+            "http://localhost:1234/v1",
             "自定义其他地址..."
         ]
         curr_base = global_config.get("api_base", "https://api.openai.com/v1")
@@ -146,23 +138,13 @@ if is_admin_mode:
         else:
             new_api_base = selected_base
 
-        new_api_key = st.text_input("API 密钥 (API Key, 本地AI可为空)", value=global_config.get("api_key", ""), type="password")
+        new_api_key = st.text_input("API 密钥 (API Key)", value=global_config.get("api_key", ""), type="password")
         
-        # 2. 模型名称 下拉菜单（集成云端与主流本地开源大模型规格）
         common_models = [
-            # 云端常用模型
-            "gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo", 
+            "gpt-4o", "gpt-3.5-turbo", 
             "deepseek-chat", "deepseek-reasoner", 
             "qwen-plus", "qwen-max", 
             "moonshot-v1-8k", 
-            # 本地主流大模型 (兼容 Ollama / LM Studio 等命名)
-            "deepseek-r1:7b", "deepseek-r1:8b", "deepseek-r1:14b", "deepseek-r1:32b",
-            "deepseek-coder-v2", 
-            "qwen3:30b", "qwen2.5:7b", "qwen2.5:14b", "qwen2.5:32b", "qwen2.5-7b-instruct",
-            "llama3.1:8b", "llama3.2:3b", "llama3.3:70b",
-            "glm4", "glm-4:9b", 
-            "gemma3:27b", "gemma2:9b", 
-            "mistral:7b",
             "自定义其他模型..."
         ]
         curr_model = global_config.get("model_name", "gpt-4o")
@@ -396,9 +378,7 @@ def generate_word_doc(content, bazi_info):
 # 生成按钮
 st.divider()
 if st.button("🚀 开始启动", type="primary", use_container_width=True):
-    is_local_ai = "localhost" in global_config.get("api_base", "") or "127.0.0.1" in global_config.get("api_base", "")
-    
-    if not global_config.get("api_key") and not is_local_ai:
+    if not global_config.get("api_key"):
         st.warning("⚠️ 接口暂未打通，请联系管理员配置。")
     else:
         with st.spinner("算力运转中，正在为您结合八字与国学全力推演，请稍候..."):
@@ -465,14 +445,13 @@ if st.button("🚀 开始启动", type="primary", use_container_width=True):
                 prompt += "5. 典故：\n"
                 prompt += "6. 寓意：\n"
 
-                actual_api_key = global_config["api_key"] if global_config["api_key"] else "sk-local-dummy-key"
-                
-                client = OpenAI(api_key=actual_api_key, base_url=global_config["api_base"])
+                # 调用 API，强制开启极大的 max_tokens 以防止截断
+                client = OpenAI(api_key=global_config["api_key"], base_url=global_config["api_base"])
                 response = client.chat.completions.create(
                     model=global_config["model_name"],
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.7,
-                    max_tokens=8192
+                    max_tokens=8192  # 给足 Token 余量，防止生成 50 个方案时被强行掐断
                 )
                 
                 ai_content = response.choices[0].message.content
@@ -498,6 +477,7 @@ if st.button("🚀 开始启动", type="primary", use_container_width=True):
                     use_container_width=True
                 )
                 
+                # 专为微信/安卓浏览器开发的 Base64 原生强制下载通道
                 b64 = base64.b64encode(word_file.getvalue()).decode()
                 href = f'<a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{b64}" download="{filename}" style="display: block; width: 100%; text-align: center; padding: 12px; margin-top: 5px; background-color: #f0f2f6; color: #1E90FF; border-radius: 8px; text-decoration: none; font-weight: bold; border: 1px solid #d5dce5; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">📲 备用直连下载通道（专供手机端）</a>'
                 st.markdown(href, unsafe_allow_html=True)
