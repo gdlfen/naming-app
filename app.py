@@ -123,7 +123,8 @@ if is_admin_mode:
             "https://api.deepseek.com/v1",
             "https://dashscope.aliyuncs.com/compatible-mode/v1",
             "https://api.moonshot.cn/v1",
-            "http://localhost:1234/v1",
+            "http://localhost:1234/v1",   # LM Studio 本地默认地址
+            "http://localhost:11434/v1",  # Ollama 本地默认地址
             "自定义其他地址..."
         ]
         curr_base = global_config.get("api_base", "https://api.openai.com/v1")
@@ -138,13 +139,15 @@ if is_admin_mode:
         else:
             new_api_base = selected_base
 
-        new_api_key = st.text_input("API 密钥 (API Key)", value=global_config.get("api_key", ""), type="password")
+        new_api_key = st.text_input("API 密钥 (API Key, 本地AI可为空)", value=global_config.get("api_key", ""), type="password")
         
         common_models = [
             "gpt-4o", "gpt-3.5-turbo", 
             "deepseek-chat", "deepseek-reasoner", 
             "qwen-plus", "qwen-max", 
             "moonshot-v1-8k", 
+            "qwen2.5-7b-instruct", # 常用本地开源模型示例
+            "llama3.1",            # 常用本地开源模型示例
             "自定义其他模型..."
         ]
         curr_model = global_config.get("model_name", "gpt-4o")
@@ -377,8 +380,11 @@ def generate_word_doc(content, bazi_info):
 
 # 生成按钮
 st.divider()
-if st.button("🚀开始启动", type="primary", use_container_width=True):
-    if not global_config.get("api_key"):
+if st.button("🚀 连接 AI 开始推演方案", type="primary", use_container_width=True):
+    # 智能识别本地AI：本地连接可以不填 API Key
+    is_local_ai = "localhost" in global_config.get("api_base", "") or "127.0.0.1" in global_config.get("api_base", "")
+    
+    if not global_config.get("api_key") and not is_local_ai:
         st.warning("⚠️ 接口暂未打通，请联系管理员配置。")
     else:
         with st.spinner("算力运转中，正在为您结合八字与国学全力推演，请稍候..."):
@@ -445,8 +451,11 @@ if st.button("🚀开始启动", type="primary", use_container_width=True):
                 prompt += "5. 典故：\n"
                 prompt += "6. 寓意：\n"
 
+                # 补全空 API Key（专为无鉴权本地 AI 准备虚拟 Key）
+                actual_api_key = global_config["api_key"] if global_config["api_key"] else "sk-local-dummy-key"
+                
                 # 调用 API，强制开启极大的 max_tokens 以防止截断
-                client = OpenAI(api_key=global_config["api_key"], base_url=global_config["api_base"])
+                client = OpenAI(api_key=actual_api_key, base_url=global_config["api_base"])
                 response = client.chat.completions.create(
                     model=global_config["model_name"],
                     messages=[{"role": "user", "content": prompt}],
